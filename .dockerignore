@@ -1,0 +1,34 @@
+# Secrets — never bake into the image; pass at runtime via --env-file / env vars
+.env
+
+# Virtualenvs
+.venv/
+venv/
+
+# Python caches / build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# LangGraph local state
+.langgraph_api/
+
+# Generated output
+output/
+*.generated.py
+
+# Tests are not needed in the runtime image
+tests/
+
+# VCS / editor / docs noise
+.git/
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose.yml
+*.md
+# ...but README.md is required by pyproject.toml at install time
+!README.md

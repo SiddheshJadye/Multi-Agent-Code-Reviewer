@@ -1,0 +1,21 @@
+# Convenience wrapper around the CLI image.
+#
+# The app is a one-shot CLI, so use `run` (not `up`) and pass the task as args:
+#
+#   docker compose build
+#   docker compose run --rm code-reviewer "Write a thread-safe LRU cache" -o output/cache.py
+#
+# Secrets come from your local .env (never baked into the image).
+
+services:
+  code-reviewer:
+    build:
+      context: .
+    image: code-reviewer:latest
+    env_file:
+      - .env
+    # Persist any --output artifacts to ./output on the host.
+    volumes:
+      - ./output:/app/output
+    # Default action when no args are given; override on the command line.
+    command: ["--help"]
