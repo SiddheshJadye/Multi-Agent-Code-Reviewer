@@ -18,11 +18,23 @@ START ─▶│  Coder  │ ─────▶ │ Reviewer │ ──▶ approv
              └─── needs changes ─┘   (cycle)
 ```
 
-- **Coder node** — generates a script from the task, or revises the previous script
-  using the Reviewer's feedback. Increments the iteration counter.
+- **Coder node** — on the first pass, writes a complete script from the task. On
+  revisions, it makes **surgical edits** instead of rewriting the whole file: it
+  emits `SEARCH/REPLACE` blocks that are applied to the previous code, so untouched
+  lines stay byte-for-byte identical. If an edit doesn't apply cleanly, it falls
+  back to a full rewrite. Increments the iteration counter.
 - **Reviewer node** — critiques the code against the task and returns a **structured
-  verdict** (`approved: bool`, `feedback: str`) via LangGraph structured output.
+  verdict** (`approved: bool`, `feedback: str`) via LangGraph structured output. On
+  follow-up reviews it is given the **full history** of the task (earlier attempts and
+  its own prior reviews) so it can focus on whether its requested changes were applied.
 - **Conditional edge** — after each review, routes back to the Coder or ends the run.
+
+> **Design note — surgical edits & reviewer memory.** The Coder edits like a human
+> using an editor (SEARCH/REPLACE + a deterministic applier + full-rewrite fallback),
+> which keeps revisions cheap and preserves already-approved code exactly — important
+> once files grow beyond toy size. The Reviewer carries memory of the whole task so
+> follow-up reviews are change-focused. See [`edits.py`](src/code_reviewer/edits.py)
+> and the prompt builders in [`prompts.py`](src/code_reviewer/prompts.py).
 
 ### Stop conditions (defense in depth)
 
@@ -44,10 +56,11 @@ START ─▶│  Coder  │ ─────▶ │ Reviewer │ ──▶ approv
 │   ├── configuration.py        # typed settings (pydantic-settings)
 │   ├── state.py                # graph state + Pydantic ReviewVerdict
 │   ├── llm.py                  # Gemini chat-model factory
-│   ├── prompts.py              # Coder & Reviewer prompts
+│   ├── prompts.py              # Coder (full + edit) & Reviewer prompts
+│   ├── edits.py                # SEARCH/REPLACE parser + applier (surgical edits)
 │   ├── nodes/
-│   │   ├── coder.py
-│   │   └── reviewer.py
+│   │   ├── coder.py            # full first draft, then surgical edits + fallback
+│   │   └── reviewer.py         # history-aware, structured verdict
 │   ├── graph.py                # builds & compiles the cyclic StateGraph (exports `graph`)
 │   ├── runner.py               # reusable orchestration
 │   └── cli.py                  # command-line entrypoint
@@ -185,7 +198,8 @@ pytest -v              # list each test by name
 ```
 
 Coverage includes the routing/stop logic, both nodes, the helpers, the CLI
-transcript, and full end-to-end cycles (loops-until-approved,
+transcript, the SEARCH/REPLACE edit parser & applier (including the fallback path),
+the history-aware reviewer prompt, and full end-to-end cycles (loops-until-approved,
 stops-at-max-iterations, first-pass approval).
 
 ---

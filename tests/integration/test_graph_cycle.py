@@ -16,8 +16,11 @@ def _wire_fakes(monkeypatch, coder_llm, reviewer_llm):
 
 
 def test_loops_until_approved(monkeypatch, make_coder_llm, make_reviewer_llm):
-    # Coder produces v1 then v2; Reviewer rejects v1, approves v2.
-    coder_llm = make_coder_llm(["# v1", "# v2 improved"])
+    # Coder writes v1 (full), then revises via a SEARCH/REPLACE edit; Reviewer
+    # rejects v1, approves v2. Exercises the real surgical-edit path end-to-end.
+    coder_llm = make_coder_llm(
+        ["# v1", "<<<<<<< SEARCH\n# v1\n=======\n# v2 improved\n>>>>>>> REPLACE"]
+    )
     reviewer_llm = make_reviewer_llm(
         [
             ReviewVerdict(approved=False, feedback="Add a docstring."),
@@ -38,8 +41,11 @@ def test_loops_until_approved(monkeypatch, make_coder_llm, make_reviewer_llm):
 def test_stops_at_max_iterations_without_approval(
     monkeypatch, make_coder_llm, make_reviewer_llm
 ):
-    # Reviewer never approves; loop must stop at the cap.
-    coder_llm = make_coder_llm(["# attempt"])
+    # Reviewer never approves; loop must stop at the cap. Revisions emit a
+    # (no-op) edit block that applies cleanly, so the Coder runs once per cycle.
+    coder_llm = make_coder_llm(
+        ["# attempt", "<<<<<<< SEARCH\n# attempt\n=======\n# attempt\n>>>>>>> REPLACE"]
+    )
     reviewer_llm = make_reviewer_llm(
         [ReviewVerdict(approved=False, feedback="Still not good enough.")]
     )
@@ -49,7 +55,7 @@ def test_stops_at_max_iterations_without_approval(
 
     assert final["approved"] is False
     assert final["iterations"] == 3  # exactly the cap, no more
-    assert coder_llm.calls == 3  # Coder invoked exactly max_iterations times
+    assert coder_llm.calls == 3  # Coder invoked exactly once per iteration
 
 
 def test_approves_on_first_pass(monkeypatch, make_coder_llm, make_reviewer_llm):

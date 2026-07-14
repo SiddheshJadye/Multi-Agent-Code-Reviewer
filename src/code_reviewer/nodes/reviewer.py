@@ -27,7 +27,12 @@ def reviewer_node(state: ReviewState) -> dict:
     messages = [
         SystemMessage(content=REVIEWER_SYSTEM_PROMPT),
         HumanMessage(
-            content=reviewer_user_prompt(task=state["task"], code=state.get("code", ""))
+            content=reviewer_user_prompt(
+                task=state["task"],
+                code=state.get("code", ""),
+                # Full memory of the task so far: earlier attempts + prior reviews.
+                history=state.get("messages", []),
+            )
         ),
     ]
 
